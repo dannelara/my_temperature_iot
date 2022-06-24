@@ -1,4 +1,4 @@
-# Tutorial for building a simple arduino based plant temperature, light and moisture sensor.
+# Tutorial for building a simple arduino based temperature sensor.
 
 Yohalmo Daniel Martinez Lara - ym222cw
 
@@ -6,7 +6,7 @@ Yohalmo Daniel Martinez Lara - ym222cw
 
 In this tutorial we will build a simple temperature communicator IOT device that will be reading the room temperature and save the data to MongoDB through our external api, which we will reach by connecting the IOT device to the wifi. The data will be presented with the help of our external API that will be saving and serving the data. In this case we will use our own created frontend with nextjs framework that will fetch and present the data saved to MongoDB.
 
-Estimated time needed: 1-2h.
+Estimated time needed: 2-3h.
 
 ## Objective
 
@@ -15,6 +15,7 @@ The reason for this procject is becase we are a big family and we often use to m
 The main purpose for this procject is to learn the basics of the world of IOT devices and how they can provide information from the real world. By creating this simple procject I believe that we will be able to gain some basic knowledge about the different workflows of IOT devices and the way we save / present the data by connecting the device to the internet.
 
 When I complete the project I will be able to understand the different ways of reading live data, from IOT devices. In this case, we will read the temperature  of a room with the help of a temperature sensor. We will have created a self-sustained IOT device that will read information on a daily basis and save that data. With the way we save the data, we will be able to view the most recent data. Altought this project is simple, it gives the posibility to add extra features add further imporvements.
+
 
 ## Material
 The required materials for the project are all included in the [Electrokit](http://www.electrokit.com) Arduino mkr1000 boundle. In this tutorial we will be using the mkr1010 wifi, but the provided mkr1000 will work aswell.
@@ -66,7 +67,7 @@ After successfully installing the IDE we need to install the SAMD CORE. This is 
 We are now ready to select the board that we will be working with.
 Follow the next steps to set the board:
 
-`Tools > Board > Arduino SAMD Boards (32-bits ARM Cortex-M0+) > Select "Arduino mkr1000`
+`Tools > Board > Arduino SAMD Boards (32-bits ARM Cortex-M0+) > Select "Arduino mkr1000" or "mkr1010"`
 ![mkr1010](https://docs.arduino.cc/static/89b34d9b99279a53f182ea1fff0dce99/29114/install_samd21_img04.png)
 <br>
 <br>
@@ -99,6 +100,36 @@ If you've bought the battery, make sure to connect it to the boards JST connecto
 The following diagram demonstrates how the Li-Po battery should be connected to the board.
 ![battery](https://www.arduino.cc/wiki/static/5fa079e468846a06c1717e6aaae3e828/5a190/mkr_tutorial_01_img_01_rev2.png)
 
+
+## Putting everything together
+
+Start by connecting the board to the breadboard. Then we will need the TMP36 temperature sensor. Connect the two jumper wires on the power rail of the breadboard, infront of the sensor. Finaly connect the TMP36 temperature (`P23`) sensor to the board (pin `A2`) with a larger jumper wire, just as shown in the image below.
+
+The TMP36 sensor is a low voltage sensor and we won't have to make an advance calibration.
+
+To get convert the voltage to celcius we will need to multiply the sensor reading by 3.3 (given the fact that the borad is of 3.3V), to convert the reading to voltage.
+
+Then we need to devide the voltage with with 1024 formula.
+To get the 
+Formula: milliVolts = (reading from ADC) * (3300/1024)
+
+Finaly we convert the milliVolts to celcius with the formula: [(analog voltage in mV) - 500] / 10
+
+See the following code to get a better picture of how we calibrate the reading into celcius.
+
+```cpp
+
+ int reading = analogRead(tempPin); 
+ float voltage = reading * 3.3; 
+ voltage /= 1023.0; 
+ float temperatureC = (voltage - 0.5) * 100 ; //converting to C.
+
+```
+
+![visualization](./img/device.jpg)
+
+`Note! You might have to force the TMP36 temperature sensor pins to the connect it to the breadboard since they are to straight by default and need a bit of bending.`
+
 ## Platform
 
 Before starting to code, I did some reserach on possible platforms that could be used for the project. However, most of them did not satisfy what I was looking for. The reason for this was that I had a few issues when I tried to connect the IOT to multiple platforms. I had some connectivity issues when trying to connect to multiple hosts and I just did not like the IOT device being directly communicating with these platforms (ex. ThingsSpeak or InfluxDB). I also did not want the IOT device to have a direct dependency on these platforms, in case I want to change them in the future. Therefore most of the services used on this project I did create myself. For example, the API and visualization are both created from scratch by me.
@@ -113,11 +144,9 @@ In the future, it will be easy to upgrade the subscriptions of the previous ment
 
 ## The code
 
-The following code bits are the most important parts of the code. The WiFiNINA library is used to connect the Thing directly the wifi. The Base64 library is used to base 64 encode the credentials required by the API and is used by the `send_message` function, that is responsible for sending messages to the API I created with the help of the WiFiSSLClient library. This function uses sub functions to load all the required information, like the `get_avg_moisture` function.
+The following code bits are the most important parts of the code. The WiFiNINA library is used to connect the Thing directly the wifi. The Base64 library is used to base 64 encode the credentials required by the API and is used by the `send_message` function, that is responsible for sending messages to the API I created with the help of the WiFiSSLClient library. This function uses sub functions to load all the required information, like the `get_temperature` function.
 
-The `get_avg_moisture` is responsible for reading the values of the moisture from the `A2` pin. It will read the value 10 times and then devide the result by 10, in order to get the avarage and most accurate value.
-
-You'll find the full code in the `''Arduino''` folder.
+The `get_temperature` is responsible for reading the values of the temperature sensor. It will read the values and calibrate them in order for the iot to then send that data.
 
 `Note! For security reasons, the network the Thing connects to is created specific for the Thing and is separate from the one the rest of us use.`
 
@@ -189,4 +218,36 @@ float get_temperature() {
 }
 
 
+
 ```
+
+## Data flow / Connectivity
+
+For this project I decided to go with wifi connectivity. Given the nature of the project, we do not need constant live data and store much information. This is why the IOT device reads the sensor data and then uses HTTP as its transport protocol to send the data to the API once every hour. The data is sent as parameters in the URL because I wanted to keep the sketch simple and not to large.
+
+Another reason for not sending data more often is because the Thing is battery powered and would run out of battery fast. Between each request the Thing goes back to sleep for an hour and sets on low power mode on all operations and the wifi connectivity, for extendend battery life.
+
+## Presenting the data
+
+For this part I decided to create my own visualization app with Nextjs. This because I wanted to make it a bit more challenging but also because I do not want the Thing to have direct communication to the front-end or the other services used. The way I have decided to present the data is that I present only the latest data.
+
+Here we can see the latest data showing the latest temperature.
+![visualization](./img/frontend.PNG)
+
+
+The API saves the new data on every request recived from the IOT device to MongoDB atlas. As stated previously, I do not want the Thing to have a dependency to these external platforms, which is why I decided to go with mongodb being controlled by the API. It will also check and delete data that was preciously saved, since I do not believe that old data is necessarly important for a project of this type.
+
+## Finalizing the design
+
+I am happy about the way I structured the project and with my own implementation of all different services used. If I had to do something differently, I would've bought or created a case for the Thing. The project is very simple but it is a good start and could be developed further in the future.
+
+All in all, I am happy to have had the opportunity to learn about IOT devices and different ways of actualy combine the knowledge I have with new ways of collecting data.
+
+![visualization](./img/device.jpg)
+![visualization](./img/frontend.png)
+
+``Video:``
+[![video session](https://www.oasisalignment.com/wp-content/uploads/2018/07/video-icon.png)](./img/video.mp4)
+
+<br>
+<br>
