@@ -239,8 +239,6 @@ All in all, I am happy to have had the opportunity to learn about IOT devices an
 ![visualization](./img/device.jpg)
 ![visualization](./img/frontend.png)
 
-`Video: Note! Video is "to big" for github so you might need to download it in order to watch it.`
-[![video session](https://www.oasisalignment.com/wp-content/uploads/2018/07/video-icon.png)](./img/video.mp4)
 
 <br>
 <br>
